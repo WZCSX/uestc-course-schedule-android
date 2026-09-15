@@ -35,6 +35,11 @@
           <span id="todayCount"></span>
         </div>
         <div class="course-list" id="todayList"></div>
+        <div class="section-heading seven-day-heading">
+          <h3>未来7天课程</h3>
+          <span>含今天</span>
+        </div>
+        <div class="seven-day-list" id="sevenDayList"></div>
       </section>
 
       <section class="view" id="scheduleView">
@@ -57,13 +62,20 @@
       </section>
 
       <section class="view" id="settingsView">
-        <div class="settings-card sync-card">
-          <div class="sync-heading">
-            <div><h3>学校课表同步</h3><p id="schoolSyncStatus">尚未连接学校教务系统</p></div>
-            <span class="sync-dot" id="syncDot"></span>
+        <div class="settings-card reminder-card">
+          <div class="reminder-heading">
+            <div><h3>上课提醒</h3><p id="reminderStatus">默认在上课前15分钟通知</p></div>
+            <label class="switch"><input type="checkbox" id="reminderEnabled" checked><span></span></label>
           </div>
-          <button class="primary-wide-button" id="schoolSyncButton">登录并同步学校课表</button>
-          <p class="sync-help">首次使用时登录统一身份认证即可。App 会自动读取首页“我的日程”中当天的课程；以后打开 App 会自动刷新。</p>
+          <label class="reminder-select">提前多久提醒
+            <select id="reminderMinutes">
+              <option value="5">5分钟</option>
+              <option value="10">10分钟</option>
+              <option value="15" selected>15分钟</option>
+              <option value="30">30分钟</option>
+            </select>
+          </label>
+          <p class="reminder-help">首次开启时请允许通知权限。App 关闭或手机锁屏后仍可提醒；手机重启后会自动恢复。</p>
         </div>
         <div class="settings-card">
           <h3>上课时间</h3>

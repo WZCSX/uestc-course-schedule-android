@@ -49,7 +49,8 @@ const DEFAULT_TIMES = {
 
 let courses = load('courses', ORIGINAL_COURSES);
 let classTimes = load('classTimes', DEFAULT_TIMES);
-let schoolToday = load('schoolToday', []);
+let reminderEnabled = localStorage.getItem('reminderEnabled') !== 'false';
+let reminderMinutes = Number(localStorage.getItem('reminderMinutes') || 15);
 let selectedWeek = clamp(getWeekNumber(new Date()), 1, 20);
 let selectedDay = getMondayDay(new Date());
 
@@ -96,8 +97,7 @@ function renderHome() {
   const now = new Date();
   const week = clamp(getWeekNumber(now), 1, 20);
   const day = getMondayDay(now);
-  const officialToday = localStorage.getItem('schoolTodayDate') === keyOf(now) ? schoolToday : [];
-  const list = officialToday.length ? officialToday : (getWeekNumber(now) >= 1 && getWeekNumber(now) <= 20 ? coursesFor(week, day) : []);
+  const list = getWeekNumber(now) >= 1 && getWeekNumber(now) <= 20 ? coursesFor(week, day) : [];
   document.getElementById('fullDate').textContent = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 · ${DAYS[day-1]}`;
   document.getElementById('currentWeekBadge').textContent = getWeekNumber(now) < 1 ? '尚未开学' : getWeekNumber(now) > 20 ? '学期已结束' : `第${week}周`;
   document.getElementById('todayCount').textContent = list.length ? `共 ${list.length} 节安排` : '轻松一下';
@@ -111,6 +111,27 @@ function renderHome() {
     nextEl.innerHTML = `<div class="hint">今日课程提醒</div><h3>今天没有课程</h3><p>可以安排自习、运动或休息</p>`;
   }
   renderCourseList('todayList', list);
+  renderSevenDays(now);
+}
+
+function renderSevenDays(startDate = new Date()) {
+  const container = document.getElementById('sevenDayList');
+  if (!container) return;
+  container.innerHTML = Array.from({length:7}, (_, offset) => {
+    const date = addDays(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 12), offset);
+    const week = getWeekNumber(date);
+    const day = getMondayDay(date);
+    const list = week >= 1 && week <= 20 ? coursesFor(week, day) : [];
+    const event = SPECIAL_DAYS[keyOf(date)] || '';
+    const items = list.length ? list.map(course => `
+      <article class="compact-course" data-id="${escapeHtml(course.id)}">
+        <span class="color-bar" style="background:${course.color}"></span>
+        <div><h4>${escapeHtml(course.name)}</h4><p>${escapeHtml([course.location, course.teacher].filter(Boolean).join(' · '))}</p></div>
+        <time>${escapeHtml(classTimes[course.period] || course.period)}</time>
+      </article>`).join('') : `<div class="seven-day-empty">${escapeHtml(event ? event + ' · 没有课程' : '没有课程')}</div>`;
+    return `<section class="seven-day-group"><div class="seven-day-date">${date.getMonth()+1}月${date.getDate()}日 · ${DAYS[day-1]}<span>${week >= 1 && week <= 20 ? '第'+week+'周' : ''}</span></div>${items}</section>`;
+  }).join('');
+  container.querySelectorAll('.compact-course').forEach(card => card.addEventListener('click', () => openDialog(card.dataset.id)));
 }
 
 function renderSchedule() {
@@ -152,90 +173,14 @@ function renderSettings() {
     classTimes[input.dataset.period] = input.value.trim();
     localStorage.setItem('classTimes', JSON.stringify(classTimes));
     showToast('上课时间已保存');
+    scheduleReminders();
   }));
-}
-
-function parseSchoolSchedule(raw) {
-  let payload;
-  try { payload = typeof raw === 'string' ? JSON.parse(raw) : raw; }
-  catch { showToast('学校课表数据无法解析'); return false; }
-  if (payload.kind === 'portalDaily') return parsePortalDaily(payload);
-  const imported = [];
-  const rows = (payload.tables || []).flatMap(table => table.rows || []);
-  let weekdayHeader = null;
-  rows.forEach(row => {
-    const cells = row.cells || [];
-    const texts = cells.map(cell => String(cell.text || '').replace(/\s+/g, ' ').trim());
-    if (texts.some(text => /星期一|周一/.test(text)) && texts.some(text => /星期五|周五/.test(text))) {
-      weekdayHeader = texts.map(text => DAYS.findIndex(day => text.includes(day.replace('周','星期'))) + 1);
-      if (weekdayHeader.every(day => day <= 0)) weekdayHeader = texts.map(text => DAYS.findIndex(day => text.includes(day)) + 1);
-      return;
-    }
-    const periodIndex = texts.findIndex(text => /^\d+\s*[-~—－]\s*\d+节?$/.test(text));
-    if (periodIndex < 0) return;
-    cells.forEach((cell, cellIndex) => {
-      const text = String(cell.text || '');
-      if (!text || cellIndex === periodIndex) return;
-      let day = weekdayHeader?.[cellIndex] || cellIndex - periodIndex;
-      if (day < 1 || day > 7) return;
-      const normalized = text.replace(/\r/g, '').replace(/[ \t]+/g, '').replace(/\n+/g, '\n');
-      const regex = /(\d{8,12})\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)\/(\d+\s*[-~—－]\s*\d+周(?:\([单双]\))?)\/(\d+\s*[-~—－]\s*\d+节)\/([^/\n]+)/g;
-      let match;
-      while ((match = regex.exec(normalized))) {
-        const weekMatch = match[6].match(/(\d+)\s*[-~—－]\s*(\d+)周/);
-        const periodMatch = match[7].match(/(\d+)\s*[-~—－]\s*(\d+)节/);
-        if (!weekMatch || !periodMatch) continue;
-        const type = /\(单\)/.test(match[6]) ? 'odd' : /\(双\)/.test(match[6]) ? 'even' : 'all';
-        const name = match[2].replace(/\([^)]*班[^)]*\)/g, '').replace(/（[^）]*班[^）]*）/g, '');
-        imported.push({
-          id:`school-${match[1]}-${day}-${periodMatch[1]}-${weekMatch[1]}-${imported.length}`,
-          name, day, period:`${periodMatch[1]}-${periodMatch[2]}节`,
-          startWeek:Number(weekMatch[1]), endWeek:Number(weekMatch[2]), weekType:type,
-          teacher:match[5], location:match[8], note:`学校同步 · ${match[1]}`,
-          color: colorForName(name), schoolImported:true
-        });
-      }
-    });
-  });
-  if (imported.length < 3) { showToast('没有识别到完整课表，请打开表格课表页面'); return false; }
-  const custom = courses.filter(course => String(course.id).startsWith('custom-'));
-  courses = [...imported, ...custom];
-  save();
-  localStorage.setItem('schoolLastSync', new Date().toISOString());
-  renderAll(); renderSettings(); updateSyncStatus();
-  showToast(`已从学校同步 ${imported.length} 条课程安排`);
-  return true;
-}
-
-function parsePortalDaily(payload) {
-  const text = String(payload.pageText || '').replace(/\r/g, '');
-  const lines = text.split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
-  const ignored = /^(我的日程|查看校历|查看日程|课程|添加日程|周[一二三四五六日]|第\d+周|\d{4}年\d{1,2}月)$/;
-  const found = [];
-  for (let i = 0; i < lines.length; i++) {
-    const time = lines[i].match(/(\d{1,2}:\d{2})\s*[-—~至]\s*(\d{1,2}:\d{2})/);
-    if (!time) continue;
-    let name = '';
-    for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
-      if (/\d{1,2}:\d{2}\s*[-—~至]/.test(lines[j])) break;
-      if (!ignored.test(lines[j]) && !/学年第.*学期/.test(lines[j])) { name = lines[j]; break; }
-    }
-    if (!name) continue;
-    const displayTime = `${time[1]}—${time[2]}`;
-    let matched = courses.find(course => course.name === name || course.name.includes(name) || name.includes(course.name));
-    if (!matched) matched = { id:`school-today-${found.length}`, name, teacher:'', location:'', note:'学校日程', color:colorForName(name) };
-    const period = Object.keys(classTimes).find(key => classTimes[key].replace(/\s/g,'') === displayTime.replace(/\s/g,'')) || matched.period || '';
-    found.push({ ...matched, id:`today-${matched.id || found.length}`, period, note:'学校“我的日程”已同步' });
-  }
-  const unique = found.filter((item, index) => found.findIndex(other => other.name === item.name && other.period === item.period) === index);
-  if (!unique.length) { showToast('已打开“我的日程”，但没有识别到当天课程'); return false; }
-  schoolToday = unique;
-  localStorage.setItem('schoolToday', JSON.stringify(schoolToday));
-  localStorage.setItem('schoolTodayDate', payload.date || keyOf(new Date()));
-  localStorage.setItem('schoolLastSync', new Date().toISOString());
-  renderAll(); updateSyncStatus();
-  showToast(`学校日程已同步：今天 ${unique.length} 门课`);
-  return true;
+  const enabled = document.getElementById('reminderEnabled');
+  const minutes = document.getElementById('reminderMinutes');
+  const status = document.getElementById('reminderStatus');
+  enabled.checked = reminderEnabled;
+  minutes.value = String(reminderMinutes);
+  status.textContent = reminderEnabled ? `将在上课前${reminderMinutes}分钟通知` : '提醒已关闭';
 }
 
 function colorForName(name) {
@@ -245,23 +190,42 @@ function colorForName(name) {
   return palette[hash % palette.length];
 }
 
-function updateSyncStatus(nativeStatus='') {
-  const last = localStorage.getItem('schoolLastSync');
-  const status = document.getElementById('schoolSyncStatus');
-  const dot = document.getElementById('syncDot');
-  if (!status || !dot) return;
-  if (last) {
-    const date = new Date(last);
-    status.textContent = nativeStatus || `上次同步：${date.getMonth()+1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    dot.classList.add('connected');
-  } else {
-    status.textContent = nativeStatus || '尚未连接学校教务系统';
-    dot.classList.remove('connected');
+function buildReminderItems() {
+  const now = Date.now();
+  const items = [];
+  for (let week = 1; week <= 20; week++) {
+    for (let day = 1; day <= 7; day++) {
+      for (const course of coursesFor(week, day)) {
+        const range = classTimes[course.period] || '';
+        const start = range.match(/(\d{1,2}):(\d{2})/);
+        if (!start) continue;
+        const date = dateFor(week, day);
+        date.setHours(Number(start[1]), Number(start[2]), 0, 0);
+        const triggerAt = date.getTime() - reminderMinutes * 60000;
+        if (triggerAt <= now) continue;
+        items.push({
+          id:`${course.id}-${keyOf(date)}-${reminderMinutes}`,
+          name:course.name,
+          location:course.location || '地点未设置',
+          startTime:`${keyOf(date)} ${start[1].padStart(2,'0')}:${start[2]}`,
+          triggerAt
+        });
+      }
+    }
   }
+  return items;
 }
 
-window.handleSchoolSchedule = parseSchoolSchedule;
-window.updateSchoolSyncStatus = updateSyncStatus;
+function scheduleReminders() {
+  localStorage.setItem('reminderEnabled', String(reminderEnabled));
+  localStorage.setItem('reminderMinutes', String(reminderMinutes));
+  const items = buildReminderItems();
+  if (window.ReminderBridge?.syncReminders) {
+    window.ReminderBridge.syncReminders(JSON.stringify(items), reminderEnabled);
+  }
+  const status = document.getElementById('reminderStatus');
+  if (status) status.textContent = reminderEnabled ? `将在上课前${reminderMinutes}分钟通知 · 已计划${items.length}次` : '提醒已关闭';
+}
 
 function populateFormOptions() {
   document.getElementById('courseDay').innerHTML = DAYS.map((d,i)=>`<option value="${i+1}">${d}</option>`).join('');
@@ -316,13 +280,13 @@ document.getElementById('courseForm').addEventListener('submit', event => {
     note: existing?.note || ''
   };
   if (existing) Object.assign(existing, course); else courses.push(course);
-  save(); document.getElementById('courseDialog').close(); renderAll(); showToast('课程已保存');
+  save(); document.getElementById('courseDialog').close(); renderAll(); scheduleReminders(); showToast('课程已保存');
 });
 
 document.getElementById('deleteCourse').addEventListener('click', () => {
   const id = document.getElementById('courseId').value;
   if (!id || !confirm('确定删除这条课程安排吗？')) return;
-  courses = courses.filter(c => c.id !== id); save(); document.getElementById('courseDialog').close(); renderAll(); showToast('课程已删除');
+  courses = courses.filter(c => c.id !== id); save(); document.getElementById('courseDialog').close(); renderAll(); scheduleReminders(); showToast('课程已删除');
 });
 
 document.getElementById('exportButton').addEventListener('click', () => {
@@ -333,18 +297,23 @@ document.getElementById('importInput').addEventListener('change', async event =>
   try {
     const data = JSON.parse(await event.target.files[0].text());
     if (!Array.isArray(data.courses)) throw new Error();
-    courses=data.courses; classTimes=data.classTimes || DEFAULT_TIMES; save(); localStorage.setItem('classTimes',JSON.stringify(classTimes)); renderAll(); showToast('导入成功');
+    courses=data.courses; classTimes=data.classTimes || DEFAULT_TIMES; save(); localStorage.setItem('classTimes',JSON.stringify(classTimes)); renderAll(); scheduleReminders(); showToast('导入成功');
   } catch { showToast('文件格式不正确'); }
   event.target.value='';
 });
 document.getElementById('resetButton').addEventListener('click', () => {
   if (!confirm('这会删除你自己添加或修改的课程，确定恢复吗？')) return;
-  courses=clone(ORIGINAL_COURSES); save(); renderAll(); showToast('已恢复原始课程');
+  courses=clone(ORIGINAL_COURSES); save(); renderAll(); scheduleReminders(); showToast('已恢复原始课程');
 });
-document.getElementById('schoolSyncButton').addEventListener('click', () => {
-  updateSyncStatus('正在打开学校统一身份认证…');
-  if (window.SchoolBridge?.openPortal) window.SchoolBridge.openPortal();
-  else window.open('https://eportal.uestc.edu.cn/', '_blank');
+document.getElementById('reminderEnabled').addEventListener('change', event => {
+  reminderEnabled = event.target.checked;
+  renderSettings();
+  scheduleReminders();
+});
+document.getElementById('reminderMinutes').addEventListener('change', event => {
+  reminderMinutes = Number(event.target.value);
+  renderSettings();
+  scheduleReminders();
 });
 
 let toastTimer;
@@ -353,5 +322,6 @@ function renderAll() { renderHome(); renderSchedule(); renderCalendar(); }
 
 populateFormOptions();
 renderAll();
-updateSyncStatus();
+renderSettings();
+scheduleReminders();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js');

@@ -1,31 +1,21 @@
 package com.yanyi.courseschedule;
 
+import android.Manifest;
 import android.app.Activity;
-import android.content.Intent;
-import android.graphics.Color;
-import android.net.Uri;
-import android.os.Bundle;
 import android.os.Build;
-import android.provider.Settings;
-import android.webkit.CookieManager;
+import android.os.Bundle;
 import android.webkit.JavascriptInterface;
-import android.webkit.WebResourceRequest;
-import android.view.Window;
-import android.webkit.ValueCallback;
-import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.graphics.Color;
+import android.view.Window;
 import android.widget.Toast;
-import org.json.JSONObject;
 
 public class MainActivity extends Activity {
     private WebView webView;
-    private ValueCallback<Uri[]> fileCallback;
-    private static final int FILE_PICKER_REQUEST = 101;
     private static final String LOCAL_APP = "file:///android_asset/index.html";
-    private static final String PORTAL_URL = "https://eportal.uestc.edu.cn/";
-    private static final String PREFS = "school_sync";
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 201;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,119 +23,33 @@ public class MainActivity extends Activity {
         Window window = getWindow();
         window.setStatusBarColor(Color.rgb(19, 95, 202));
         window.setNavigationBarColor(Color.WHITE);
+        ReminderScheduler.createNotificationChannel(this);
 
         webView = new WebView(this);
         setContentView(webView);
-
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(true);
-        settings.setDatabaseEnabled(true);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
-        CookieManager.getInstance().setAcceptCookie(true);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
-        }
-
-        webView.addJavascriptInterface(new SchoolBridge(), "SchoolBridge");
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                if (url.startsWith("file:///android_asset/")) {
-                    deliverPendingSchedule();
-                } else if (isSchoolUrl(url)) {
-                    injectScheduleDetector();
-                }
-            }
-        });
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
-                if (fileCallback != null) fileCallback.onReceiveValue(null);
-                fileCallback = callback;
-                try {
-                    startActivityForResult(params.createIntent(), FILE_PICKER_REQUEST);
-                    return true;
-                } catch (Exception exception) {
-                    fileCallback = null;
-                    return false;
-                }
-            }
-        });
-        String courseUrl = getSharedPreferences(PREFS, MODE_PRIVATE).getString("course_url", "");
-        webView.loadUrl(courseUrl.isEmpty() ? LOCAL_APP : courseUrl);
+        webView.addJavascriptInterface(new ReminderBridge(), "ReminderBridge");
+        webView.setWebViewClient(new WebViewClient());
+        webView.loadUrl(LOCAL_APP);
     }
 
-    private boolean isSchoolUrl(String url) {
-        try {
-            String host = Uri.parse(url).getHost();
-            return host != null && (host.equals("uestc.edu.cn") || host.endsWith(".uestc.edu.cn"));
-        } catch (Exception ignored) { return false; }
-    }
-
-    private void injectScheduleDetector() {
-        String script = "(function(){try{" +
-            "if(window.__uestcScheduleDetector)return;window.__uestcScheduleDetector=true;" +
-            "var sent=false;" +
-            "function clean(s){return String(s||'').replace(/\\r/g,'').replace(/[ \\t]+/g,' ').trim();}" +
-            "function scan(){try{if(sent)return;var body=clean((document.body&&document.body.innerText)||'');if(!body)return;" +
-            "var dailyStart=body.indexOf('我的日程');" +
-            "if(dailyStart>=0){var dailyEnd=body.indexOf('业务直通车',dailyStart);var daily=body.slice(dailyStart,dailyEnd>dailyStart?dailyEnd:dailyStart+6000);" +
-            "var times=daily.match(/\\d{1,2}:\\d{2}\\s*[-—~至]\\s*\\d{1,2}:\\d{2}/g)||[];" +
-            "if(times.length){sent=true;var n=new Date(),date=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');" +
-            "SchoolBridge.captureSchedule(JSON.stringify({kind:'portalDaily',url:location.href,title:document.title,date:date,pageText:daily}),location.href);return;}}" +
-            "if(/(节次|1-2节|3-4节)/.test(body)&&/(星期一|周一)/.test(body)){" +
-            "var tables=[].slice.call(document.querySelectorAll('table')).map(function(t){return {rows:[].slice.call(t.querySelectorAll('tr')).map(function(r){return {cells:[].slice.call(r.querySelectorAll('th,td')).map(function(c){return {text:c.innerText||c.textContent||''};})};})};});" +
-            "if(tables.length){sent=true;SchoolBridge.captureSchedule(JSON.stringify({kind:'table',url:location.href,title:document.title,tables:tables}),location.href);return;}}" +
-            "}catch(e){}}" +
-            "scan();var timer=setInterval(scan,1500);setTimeout(function(){clearInterval(timer);},120000);" +
-            "}catch(e){}})();";
-        webView.evaluateJavascript(script, null);
-    }
-
-    private void deliverPendingSchedule() {
-        String raw = getSharedPreferences(PREFS, MODE_PRIVATE).getString("pending_schedule", "");
-        if (raw.isEmpty()) return;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove("pending_schedule").apply();
-        webView.evaluateJavascript("window.handleSchoolSchedule(" + JSONObject.quote(raw) + ");", null);
-    }
-
-    public class SchoolBridge {
+    public class ReminderBridge {
         @JavascriptInterface
-        public void openPortal() {
+        public void syncReminders(String remindersJson, boolean enabled) {
             runOnUiThread(() -> {
-                String saved = getSharedPreferences(PREFS, MODE_PRIVATE).getString("course_url", PORTAL_URL);
-                webView.loadUrl(saved);
+                if (enabled && Build.VERSION.SDK_INT >= 33 &&
+                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+                }
+                int count = ReminderScheduler.sync(MainActivity.this, remindersJson, enabled);
+                String message = enabled ? "已安排 " + count + " 个上课提醒" : "上课提醒已关闭";
+                Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
             });
-        }
-
-        @JavascriptInterface
-        public void captureSchedule(String raw, String pageUrl) {
-            String current = webView.getUrl();
-            if (!isSchoolUrl(current) || raw == null || raw.length() < 50) return;
-            if (!raw.contains("portalDaily") && !raw.matches("(?s).*\\d{8,12}.*\\d+\\s*[-~—－]\\s*\\d+周.*")) return;
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                .putString("pending_schedule", raw)
-                .putString("course_url", pageUrl)
-                .apply();
-            runOnUiThread(() -> {
-                Toast.makeText(MainActivity.this, "已识别学校课表，正在导入", Toast.LENGTH_SHORT).show();
-                webView.loadUrl(LOCAL_APP);
-            });
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == FILE_PICKER_REQUEST && fileCallback != null) {
-            Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
-            fileCallback.onReceiveValue(result);
-            fileCallback = null;
         }
     }
 

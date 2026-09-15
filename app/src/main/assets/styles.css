@@ -60,6 +60,17 @@ main { padding-bottom: calc(92px + var(--safe-bottom)); }
 .section-heading h3 { margin: 0; font-size: 17px; }
 .section-heading span { color: var(--muted); font-size: 12px; }
 .course-list { display: grid; gap: 11px; }
+.seven-day-heading { margin-top: 25px; }
+.seven-day-list { display: grid; gap: 12px; }
+.seven-day-group { overflow: hidden; border: 1px solid var(--line); border-radius: 17px; background: white; }
+.seven-day-date { display: flex; justify-content: space-between; padding: 11px 14px; color: var(--ink); background: #eef5ff; font-size: 13px; font-weight: 700; }
+.seven-day-date span { color: var(--muted); font-size: 11px; font-weight: 500; }
+.seven-day-empty { padding: 15px; color: var(--muted); font-size: 12px; }
+.compact-course { display: grid; grid-template-columns: 5px 1fr auto; gap: 10px; align-items: center; padding: 12px 13px; border-top: 1px solid var(--line); background: white; }
+.compact-course .color-bar { width: 5px; height: 37px; border-radius: 9px; }
+.compact-course h4 { margin: 0 0 4px; font-size: 14px; }
+.compact-course p { margin: 0; color: var(--muted); font-size: 11px; }
+.compact-course time { color: var(--primary); font-size: 11px; font-weight: 700; text-align: right; }
 .course-card {
   position: relative; display: grid; grid-template-columns: 8px 1fr auto; gap: 13px;
   align-items: center; min-height: 91px; padding: 15px 14px 15px 10px;
@@ -100,13 +111,17 @@ main { padding-bottom: calc(92px + var(--safe-bottom)); }
 .settings-card { padding: 18px; margin-bottom: 13px; border: 1px solid var(--line); border-radius: 18px; background: white; }
 .settings-card h3 { margin: 0 0 8px; font-size: 16px; }
 .settings-card > p { margin: 0 0 15px; color: var(--muted); font-size: 12px; line-height: 1.65; }
-.sync-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.sync-heading h3 { margin-bottom: 5px; }
-.sync-heading p { margin: 0; color: var(--muted); font-size: 12px; }
-.sync-dot { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: #c8d0dc; box-shadow: 0 0 0 5px #f1f3f7; }
-.sync-dot.connected { background: #16a36a; box-shadow: 0 0 0 5px #e7f8f0; }
-.primary-wide-button { width: 100%; margin-top: 16px; padding: 13px; border: 0; border-radius: 13px; color: white; background: var(--primary); font-weight: 700; }
-.sync-help { margin: 12px 0 0 !important; }
+.reminder-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.reminder-heading h3 { margin-bottom: 5px; }
+.reminder-heading p { margin: 0; color: var(--muted); font-size: 12px; }
+.switch input { display: none; }
+.switch span { position: relative; display: block; width: 48px; height: 28px; border-radius: 999px; background: #c8d0dc; transition: .2s; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: white; box-shadow: 0 2px 7px rgba(0,0,0,.2); transition: .2s; }
+.switch input:checked + span { background: var(--primary); }
+.switch input:checked + span::after { transform: translateX(20px); }
+.reminder-select { display: grid; grid-template-columns: 1fr 115px; align-items: center; gap: 12px; margin-top: 17px; color: var(--muted); font-size: 12px; }
+.reminder-select select { padding: 10px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: white; }
+.reminder-help { margin: 13px 0 0 !important; }
 .time-setting { display: grid; grid-template-columns: 65px 1fr; align-items: center; gap: 10px; margin-top: 9px; }
 .time-setting label { color: var(--muted); font-size: 12px; }
 .time-setting input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 11px; }
