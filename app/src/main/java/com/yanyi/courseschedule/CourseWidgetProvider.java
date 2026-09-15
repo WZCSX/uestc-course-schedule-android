@@ -51,7 +51,17 @@ public class CourseWidgetProvider extends AppWidgetProvider {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         ComponentName component = new ComponentName(context, CourseWidgetProvider.class);
         int[] ids = manager.getAppWidgetIds(component);
-        for (int id : ids) manager.updateAppWidget(id, buildViews(context));
+        for (int id : ids) {
+            try {
+                manager.updateAppWidget(id, buildViews(context));
+            } catch (Exception ignored) {
+                RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.course_widget);
+                fallback.setTextViewText(R.id.widget_date, "研一课程表");
+                fallback.setTextViewText(R.id.widget_count, "请打开一次 App");
+                fallback.setTextViewText(R.id.widget_empty, "正在准备今天的课程");
+                manager.updateAppWidget(id, fallback);
+            }
+        }
     }
 
     private static RemoteViews buildViews(Context context) {

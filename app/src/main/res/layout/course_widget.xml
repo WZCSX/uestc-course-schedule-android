@@ -12,8 +12,8 @@
         <TextView android:id="@+id/widget_count" android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:text="今天无课" android:textColor="#CCFFFFFF" android:textSize="11sp"/>
     </LinearLayout>
-    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="9dp"
-        android:layout_marginBottom="6dp" android:background="#33FFFFFF"/>
+    <TextView android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="9dp"
+        android:layout_marginBottom="6dp" android:background="#33FFFFFF" android:text=""/>
     <TextView android:id="@+id/widget_empty" android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:gravity="center" android:text="今天没有课程\n好好安排自己的时间吧"
         android:textColor="#DDFFFFFF" android:textSize="13sp"/>
