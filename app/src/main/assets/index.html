@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1f6feb" />
+  <meta name="description" content="2026—2027学年第一学期个人课程表" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>研一课程表</title>
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">2026—2027学年 · 第一学期</p>
+        <h1 id="pageTitle">今天</h1>
+      </div>
+      <button class="icon-button" id="addButton" aria-label="添加课程">＋</button>
+    </header>
+
+    <main>
+      <section class="view active" id="homeView">
+        <div class="date-hero">
+          <div>
+            <p id="fullDate"></p>
+            <h2 id="todayGreeting">今天的课程</h2>
+          </div>
+          <div class="week-badge" id="currentWeekBadge">第3周</div>
+        </div>
+        <div class="next-card" id="nextCourseCard"></div>
+        <div class="section-heading">
+          <h3>今日安排</h3>
+          <span id="todayCount"></span>
+        </div>
+        <div class="course-list" id="todayList"></div>
+      </section>
+
+      <section class="view" id="scheduleView">
+        <div class="week-switcher">
+          <button id="prevWeek" aria-label="上一周">‹</button>
+          <button class="week-title" id="weekTitle">第3周</button>
+          <button id="nextWeek" aria-label="下一周">›</button>
+        </div>
+        <div class="day-strip" id="dayStrip"></div>
+        <div class="course-list" id="scheduleList"></div>
+      </section>
+
+      <section class="view" id="calendarView">
+        <div class="calendar-summary">
+          <span>8月31日开学</span>
+          <span>共20周</span>
+          <span>1月18日起寒假</span>
+        </div>
+        <div id="semesterCalendar"></div>
+      </section>
+
+      <section class="view" id="settingsView">
+        <div class="settings-card">
+          <h3>上课时间</h3>
+          <p>原课表图片只提供节次，没有具体钟点。你可以在这里补充，课程卡片会自动显示。</p>
+          <div id="timeSettings"></div>
+        </div>
+        <div class="settings-card">
+          <h3>数据管理</h3>
+          <button class="setting-action" id="exportButton">导出课程数据</button>
+          <label class="setting-action file-label">导入课程数据<input type="file" id="importInput" accept="application/json" /></label>
+          <button class="setting-action danger" id="resetButton">恢复图片中的原始课程</button>
+        </div>
+        <div class="settings-card note-card">
+          <h3>校历说明</h3>
+          <p>运动会：9月19—20日；国庆节：10月1—7日；考试周：第19—20周；寒假：2027年1月18日—2月28日。</p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="主导航">
+      <button class="nav-item active" data-view="homeView" data-title="今天"><span>⌂</span>今天</button>
+      <button class="nav-item" data-view="scheduleView" data-title="课程表"><span>▦</span>课程表</button>
+      <button class="nav-item" data-view="calendarView" data-title="校历"><span>□</span>校历</button>
+      <button class="nav-item" data-view="settingsView" data-title="设置"><span>⚙</span>设置</button>
+    </nav>
+  </div>
+
+  <dialog id="courseDialog">
+    <form method="dialog" id="courseForm">
+      <div class="dialog-header">
+        <h2 id="dialogTitle">添加课程</h2>
+        <button value="cancel" class="close-button" aria-label="关闭">×</button>
+      </div>
+      <input type="hidden" id="courseId" />
+      <label>课程名称<input id="courseName" required placeholder="例如：矩阵理论" /></label>
+      <div class="form-row">
+        <label>星期<select id="courseDay" required></select></label>
+        <label>节次<select id="coursePeriod" required></select></label>
+      </div>
+      <div class="form-row">
+        <label>起始周<input id="startWeek" type="number" min="1" max="20" value="1" required /></label>
+        <label>结束周<input id="endWeek" type="number" min="1" max="20" value="18" required /></label>
+      </div>
+      <div class="form-row">
+        <label>单双周<select id="weekType"><option value="all">每周</option><option value="odd">单周</option><option value="even">双周</option></select></label>
+        <label>颜色<input id="courseColor" type="color" value="#3b82f6" /></label>
+      </div>
+      <label>教师<input id="teacher" placeholder="教师姓名" /></label>
+      <label>地点<input id="location" placeholder="例如：二教307" /></label>
+      <div class="dialog-actions">
+        <button type="button" class="delete-button" id="deleteCourse">删除</button>
+        <button type="button" class="secondary-button" id="cancelDialog">取消</button>
+        <button type="submit" class="primary-button" value="default">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
