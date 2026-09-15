@@ -89,10 +89,20 @@ public class MainActivity extends Activity {
 
     private void injectScheduleDetector() {
         String script = "(function(){try{" +
-            "var body=(document.body&&document.body.innerText)||'';" +
-            "if(!/(节次|1-2节|3-4节)/.test(body)||!/(星期一|周一)/.test(body))return;" +
+            "if(window.__uestcScheduleDetector)return;window.__uestcScheduleDetector=true;" +
+            "var sent=false;" +
+            "function clean(s){return String(s||'').replace(/\\r/g,'').replace(/[ \\t]+/g,' ').trim();}" +
+            "function scan(){try{if(sent)return;var body=clean((document.body&&document.body.innerText)||'');if(!body)return;" +
+            "var dailyStart=body.indexOf('我的日程');" +
+            "if(dailyStart>=0){var dailyEnd=body.indexOf('业务直通车',dailyStart);var daily=body.slice(dailyStart,dailyEnd>dailyStart?dailyEnd:dailyStart+6000);" +
+            "var times=daily.match(/\\d{1,2}:\\d{2}\\s*[-—~至]\\s*\\d{1,2}:\\d{2}/g)||[];" +
+            "if(times.length){sent=true;var n=new Date(),date=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');" +
+            "SchoolBridge.captureSchedule(JSON.stringify({kind:'portalDaily',url:location.href,title:document.title,date:date,pageText:daily}),location.href);return;}}" +
+            "if(/(节次|1-2节|3-4节)/.test(body)&&/(星期一|周一)/.test(body)){" +
             "var tables=[].slice.call(document.querySelectorAll('table')).map(function(t){return {rows:[].slice.call(t.querySelectorAll('tr')).map(function(r){return {cells:[].slice.call(r.querySelectorAll('th,td')).map(function(c){return {text:c.innerText||c.textContent||''};})};})};});" +
-            "if(tables.length)SchoolBridge.captureSchedule(JSON.stringify({url:location.href,title:document.title,tables:tables}),location.href);" +
+            "if(tables.length){sent=true;SchoolBridge.captureSchedule(JSON.stringify({kind:'table',url:location.href,title:document.title,tables:tables}),location.href);return;}}" +
+            "}catch(e){}}" +
+            "scan();var timer=setInterval(scan,1500);setTimeout(function(){clearInterval(timer);},120000);" +
             "}catch(e){}})();";
         webView.evaluateJavascript(script, null);
     }
@@ -117,6 +127,7 @@ public class MainActivity extends Activity {
         public void captureSchedule(String raw, String pageUrl) {
             String current = webView.getUrl();
             if (!isSchoolUrl(current) || raw == null || raw.length() < 50) return;
+            if (!raw.contains("portalDaily") && !raw.matches("(?s).*\\d{8,12}.*\\d+\\s*[-~—－]\\s*\\d+周.*")) return;
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString("pending_schedule", raw)
                 .putString("course_url", pageUrl)

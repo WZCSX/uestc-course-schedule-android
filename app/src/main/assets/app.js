@@ -49,6 +49,7 @@ const DEFAULT_TIMES = {
 
 let courses = load('courses', ORIGINAL_COURSES);
 let classTimes = load('classTimes', DEFAULT_TIMES);
+let schoolToday = load('schoolToday', []);
 let selectedWeek = clamp(getWeekNumber(new Date()), 1, 20);
 let selectedDay = getMondayDay(new Date());
 
@@ -95,7 +96,8 @@ function renderHome() {
   const now = new Date();
   const week = clamp(getWeekNumber(now), 1, 20);
   const day = getMondayDay(now);
-  const list = getWeekNumber(now) >= 1 && getWeekNumber(now) <= 20 ? coursesFor(week, day) : [];
+  const officialToday = localStorage.getItem('schoolTodayDate') === keyOf(now) ? schoolToday : [];
+  const list = officialToday.length ? officialToday : (getWeekNumber(now) >= 1 && getWeekNumber(now) <= 20 ? coursesFor(week, day) : []);
   document.getElementById('fullDate').textContent = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 · ${DAYS[day-1]}`;
   document.getElementById('currentWeekBadge').textContent = getWeekNumber(now) < 1 ? '尚未开学' : getWeekNumber(now) > 20 ? '学期已结束' : `第${week}周`;
   document.getElementById('todayCount').textContent = list.length ? `共 ${list.length} 节安排` : '轻松一下';
@@ -157,6 +159,7 @@ function parseSchoolSchedule(raw) {
   let payload;
   try { payload = typeof raw === 'string' ? JSON.parse(raw) : raw; }
   catch { showToast('学校课表数据无法解析'); return false; }
+  if (payload.kind === 'portalDaily') return parsePortalDaily(payload);
   const imported = [];
   const rows = (payload.tables || []).flatMap(table => table.rows || []);
   let weekdayHeader = null;
@@ -201,6 +204,37 @@ function parseSchoolSchedule(raw) {
   localStorage.setItem('schoolLastSync', new Date().toISOString());
   renderAll(); renderSettings(); updateSyncStatus();
   showToast(`已从学校同步 ${imported.length} 条课程安排`);
+  return true;
+}
+
+function parsePortalDaily(payload) {
+  const text = String(payload.pageText || '').replace(/\r/g, '');
+  const lines = text.split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const ignored = /^(我的日程|查看校历|查看日程|课程|添加日程|周[一二三四五六日]|第\d+周|\d{4}年\d{1,2}月)$/;
+  const found = [];
+  for (let i = 0; i < lines.length; i++) {
+    const time = lines[i].match(/(\d{1,2}:\d{2})\s*[-—~至]\s*(\d{1,2}:\d{2})/);
+    if (!time) continue;
+    let name = '';
+    for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+      if (/\d{1,2}:\d{2}\s*[-—~至]/.test(lines[j])) break;
+      if (!ignored.test(lines[j]) && !/学年第.*学期/.test(lines[j])) { name = lines[j]; break; }
+    }
+    if (!name) continue;
+    const displayTime = `${time[1]}—${time[2]}`;
+    let matched = courses.find(course => course.name === name || course.name.includes(name) || name.includes(course.name));
+    if (!matched) matched = { id:`school-today-${found.length}`, name, teacher:'', location:'', note:'学校日程', color:colorForName(name) };
+    const period = Object.keys(classTimes).find(key => classTimes[key].replace(/\s/g,'') === displayTime.replace(/\s/g,'')) || matched.period || '';
+    found.push({ ...matched, id:`today-${matched.id || found.length}`, period, note:'学校“我的日程”已同步' });
+  }
+  const unique = found.filter((item, index) => found.findIndex(other => other.name === item.name && other.period === item.period) === index);
+  if (!unique.length) { showToast('已打开“我的日程”，但没有识别到当天课程'); return false; }
+  schoolToday = unique;
+  localStorage.setItem('schoolToday', JSON.stringify(schoolToday));
+  localStorage.setItem('schoolTodayDate', payload.date || keyOf(new Date()));
+  localStorage.setItem('schoolLastSync', new Date().toISOString());
+  renderAll(); updateSyncStatus();
+  showToast(`学校日程已同步：今天 ${unique.length} 门课`);
   return true;
 }
 
