@@ -34,6 +34,7 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         webView.addJavascriptInterface(new ReminderBridge(), "ReminderBridge");
+        webView.addJavascriptInterface(new WidgetBridge(), "WidgetBridge");
         webView.setWebViewClient(new WebViewClient());
         webView.loadUrl(LOCAL_APP);
     }
@@ -50,6 +51,13 @@ public class MainActivity extends Activity {
                 String message = enabled ? "已安排 " + count + " 个上课提醒" : "上课提醒已关闭";
                 Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
             });
+        }
+    }
+
+    public class WidgetBridge {
+        @JavascriptInterface
+        public void updateSchedule(String scheduleJson) {
+            CourseWidgetProvider.saveAndUpdate(MainActivity.this, scheduleJson);
         }
     }
 

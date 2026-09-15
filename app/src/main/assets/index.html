@@ -35,11 +35,6 @@
           <span id="todayCount"></span>
         </div>
         <div class="course-list" id="todayList"></div>
-        <div class="section-heading seven-day-heading">
-          <h3>未来7天课程</h3>
-          <span>含今天</span>
-        </div>
-        <div class="seven-day-list" id="sevenDayList"></div>
       </section>
 
       <section class="view" id="scheduleView">
@@ -48,8 +43,18 @@
           <button class="week-title" id="weekTitle">第3周</button>
           <button id="nextWeek" aria-label="下一周">›</button>
         </div>
-        <div class="day-strip" id="dayStrip"></div>
-        <div class="course-list" id="scheduleList"></div>
+        <div class="view-mode-switch" aria-label="课程表查看模式">
+          <button class="active" id="dayModeButton">单日</button>
+          <button id="weekModeButton">七日</button>
+        </div>
+        <div id="dayScheduleMode">
+          <div class="day-strip" id="dayStrip"></div>
+          <div class="course-list" id="scheduleList"></div>
+        </div>
+        <div id="weekScheduleMode" class="hidden">
+          <div class="week-overview" id="weekOverview"></div>
+          <p class="week-overview-tip">点击课程可以查看或修改详细信息</p>
+        </div>
       </section>
 
       <section class="view" id="calendarView">

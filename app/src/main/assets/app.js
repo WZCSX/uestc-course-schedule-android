@@ -51,6 +51,7 @@ let courses = load('courses', ORIGINAL_COURSES);
 let classTimes = load('classTimes', DEFAULT_TIMES);
 let reminderEnabled = localStorage.getItem('reminderEnabled') !== 'false';
 let reminderMinutes = Number(localStorage.getItem('reminderMinutes') || 15);
+let scheduleMode = localStorage.getItem('scheduleMode') || 'day';
 let selectedWeek = clamp(getWeekNumber(new Date()), 1, 20);
 let selectedDay = getMondayDay(new Date());
 
@@ -111,27 +112,6 @@ function renderHome() {
     nextEl.innerHTML = `<div class="hint">今日课程提醒</div><h3>今天没有课程</h3><p>可以安排自习、运动或休息</p>`;
   }
   renderCourseList('todayList', list);
-  renderSevenDays(now);
-}
-
-function renderSevenDays(startDate = new Date()) {
-  const container = document.getElementById('sevenDayList');
-  if (!container) return;
-  container.innerHTML = Array.from({length:7}, (_, offset) => {
-    const date = addDays(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 12), offset);
-    const week = getWeekNumber(date);
-    const day = getMondayDay(date);
-    const list = week >= 1 && week <= 20 ? coursesFor(week, day) : [];
-    const event = SPECIAL_DAYS[keyOf(date)] || '';
-    const items = list.length ? list.map(course => `
-      <article class="compact-course" data-id="${escapeHtml(course.id)}">
-        <span class="color-bar" style="background:${course.color}"></span>
-        <div><h4>${escapeHtml(course.name)}</h4><p>${escapeHtml([course.location, course.teacher].filter(Boolean).join(' · '))}</p></div>
-        <time>${escapeHtml(classTimes[course.period] || course.period)}</time>
-      </article>`).join('') : `<div class="seven-day-empty">${escapeHtml(event ? event + ' · 没有课程' : '没有课程')}</div>`;
-    return `<section class="seven-day-group"><div class="seven-day-date">${date.getMonth()+1}月${date.getDate()}日 · ${DAYS[day-1]}<span>${week >= 1 && week <= 20 ? '第'+week+'周' : ''}</span></div>${items}</section>`;
-  }).join('');
-  container.querySelectorAll('.compact-course').forEach(card => card.addEventListener('click', () => openDialog(card.dataset.id)));
 }
 
 function renderSchedule() {
@@ -148,6 +128,26 @@ function renderSchedule() {
   const date = dateFor(selectedWeek, selectedDay);
   const event = SPECIAL_DAYS[keyOf(date)];
   renderCourseList('scheduleList', coursesFor(selectedWeek, selectedDay), event ? `${event} · 当天没有排课` : `${DAYS[selectedDay-1]}没有课程`);
+  renderWeekOverview(todayKey);
+  document.getElementById('dayScheduleMode').classList.toggle('hidden', scheduleMode !== 'day');
+  document.getElementById('weekScheduleMode').classList.toggle('hidden', scheduleMode !== 'week');
+  document.getElementById('dayModeButton').classList.toggle('active', scheduleMode === 'day');
+  document.getElementById('weekModeButton').classList.toggle('active', scheduleMode === 'week');
+}
+
+function renderWeekOverview(todayKey = keyOf(new Date())) {
+  const container = document.getElementById('weekOverview');
+  container.innerHTML = DAYS.map((dayName, index) => {
+    const day = index + 1;
+    const date = dateFor(selectedWeek, day);
+    const list = coursesFor(selectedWeek, day);
+    const chips = list.length ? list.map(course => {
+      const start = (classTimes[course.period] || course.period).split(/[—~-]/)[0];
+      return `<button class="week-chip" data-id="${escapeHtml(course.id)}" style="border-left:3px solid ${course.color}"><b>${escapeHtml(course.name)}</b><span>${escapeHtml(start)} · ${escapeHtml(course.location || '待定')}</span></button>`;
+    }).join('') : '<div class="week-empty">无课</div>';
+    return `<section class="week-day-column ${keyOf(date)===todayKey?'today':''}"><div class="week-day-head">${dayName.slice(1)}<strong>${date.getDate()}</strong></div>${chips}</section>`;
+  }).join('');
+  container.querySelectorAll('.week-chip').forEach(card => card.addEventListener('click', () => openDialog(card.dataset.id)));
 }
 
 function formatRange(a,b) { return `${a.getMonth()+1}.${a.getDate()}—${b.getMonth()+1}.${b.getDate()}`; }
@@ -225,6 +225,32 @@ function scheduleReminders() {
   }
   const status = document.getElementById('reminderStatus');
   if (status) status.textContent = reminderEnabled ? `将在上课前${reminderMinutes}分钟通知 · 已计划${items.length}次` : '提醒已关闭';
+  updateDesktopWidget();
+}
+
+function buildWidgetSchedule() {
+  const items = [];
+  for (let week = 1; week <= 20; week++) {
+    for (let day = 1; day <= 7; day++) {
+      const date = dateFor(week, day);
+      for (const course of coursesFor(week, day)) {
+        items.push({
+          date:keyOf(date),
+          name:course.name,
+          location:course.location || '地点未设置',
+          time:classTimes[course.period] || course.period,
+          order:periodOrder(course.period)
+        });
+      }
+    }
+  }
+  return items;
+}
+
+function updateDesktopWidget() {
+  if (window.WidgetBridge?.updateSchedule) {
+    window.WidgetBridge.updateSchedule(JSON.stringify(buildWidgetSchedule()));
+  }
 }
 
 function populateFormOptions() {
@@ -262,6 +288,12 @@ document.querySelectorAll('.nav-item').forEach(button => button.addEventListener
 document.getElementById('prevWeek').addEventListener('click', () => { selectedWeek = clamp(selectedWeek - 1, 1, 20); renderSchedule(); });
 document.getElementById('nextWeek').addEventListener('click', () => { selectedWeek = clamp(selectedWeek + 1, 1, 20); renderSchedule(); });
 document.getElementById('weekTitle').addEventListener('click', () => { selectedWeek = clamp(getWeekNumber(new Date()),1,20); selectedDay=getMondayDay(new Date()); renderSchedule(); });
+document.getElementById('dayModeButton').addEventListener('click', () => {
+  scheduleMode = 'day'; localStorage.setItem('scheduleMode', scheduleMode); renderSchedule();
+});
+document.getElementById('weekModeButton').addEventListener('click', () => {
+  scheduleMode = 'week'; localStorage.setItem('scheduleMode', scheduleMode); renderSchedule();
+});
 document.getElementById('addButton').addEventListener('click', () => openDialog());
 document.getElementById('cancelDialog').addEventListener('click', () => document.getElementById('courseDialog').close());
 
