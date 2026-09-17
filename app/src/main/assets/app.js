@@ -322,15 +322,63 @@ document.getElementById('deleteCourse').addEventListener('click', () => {
 });
 
 document.getElementById('exportButton').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify({courses,classTimes}, null, 2)], {type:'application/json'});
+  const payload = JSON.stringify({
+    schemaVersion:1,
+    appName:'研一课程表',
+    exportedAt:new Date().toISOString(),
+    courses,
+    classTimes
+  }, null, 2);
+  if (window.ScheduleFileBridge?.exportSchedule) {
+    window.ScheduleFileBridge.exportSchedule(payload);
+    return;
+  }
+  const blob = new Blob([payload], {type:'application/json'});
   const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='研一课程表数据.json'; a.click(); URL.revokeObjectURL(a.href);
 });
-document.getElementById('importInput').addEventListener('change', async event => {
+
+function applyImportedSchedule(raw) {
   try {
-    const data = JSON.parse(await event.target.files[0].text());
-    if (!Array.isArray(data.courses)) throw new Error();
-    courses=data.courses; classTimes=data.classTimes || DEFAULT_TIMES; save(); localStorage.setItem('classTimes',JSON.stringify(classTimes)); renderAll(); scheduleReminders(); showToast('导入成功');
-  } catch { showToast('文件格式不正确'); }
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!Array.isArray(data.courses) || !data.courses.length) throw new Error('没有课程');
+    const valid = data.courses.every(course =>
+      course && typeof course.name === 'string' && course.name.trim() &&
+      Number(course.day) >= 1 && Number(course.day) <= 7 &&
+      typeof course.period === 'string' &&
+      Number(course.startWeek) >= 1 && Number(course.endWeek) >= Number(course.startWeek)
+    );
+    if (!valid) throw new Error('课程字段不完整');
+    if (!confirm(`文件中包含 ${data.courses.length} 条课程安排。导入后将替换当前课程表，确定继续吗？`)) return false;
+    courses = data.courses.map(course => ({
+      ...course,
+      day:Number(course.day),
+      startWeek:Number(course.startWeek),
+      endWeek:Number(course.endWeek),
+      weekType:['all','odd','even'].includes(course.weekType) ? course.weekType : 'all',
+      color:course.color || colorForName(course.name)
+    }));
+    classTimes = data.classTimes && typeof data.classTimes === 'object' ? {...DEFAULT_TIMES, ...data.classTimes} : clone(DEFAULT_TIMES);
+    save();
+    localStorage.setItem('classTimes', JSON.stringify(classTimes));
+    renderAll();
+    renderSettings();
+    scheduleReminders();
+    showToast(`导入成功：${courses.length} 条课程`);
+    return true;
+  } catch (error) {
+    showToast('文件格式不正确，未修改当前课表');
+    return false;
+  }
+}
+
+window.handleImportedSchedule = applyImportedSchedule;
+
+document.getElementById('importButton').addEventListener('click', () => {
+  if (window.ScheduleFileBridge?.importSchedule) window.ScheduleFileBridge.importSchedule();
+  else document.getElementById('importInput').click();
+});
+document.getElementById('importInput').addEventListener('change', async event => {
+  if (event.target.files?.[0]) applyImportedSchedule(await event.target.files[0].text());
   event.target.value='';
 });
 document.getElementById('resetButton').addEventListener('click', () => {
