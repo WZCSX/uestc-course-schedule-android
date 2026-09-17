@@ -23,20 +23,41 @@ button { cursor: pointer; }
 
 #app { max-width: 560px; min-height: 100vh; margin: 0 auto; background: var(--background); }
 .app-header {
-  position: sticky; top: 0; z-index: 10;
+  position: sticky; top: 0; z-index: 10; overflow: hidden;
   display: flex; align-items: center; justify-content: space-between;
-  padding: max(18px, env(safe-area-inset-top)) 20px 16px;
+  min-height: 148px; padding: max(16px, env(safe-area-inset-top)) 20px 15px;
   color: white;
-  background: linear-gradient(135deg, #135fca, #0d3f8f);
-  box-shadow: 0 8px 24px rgba(13, 71, 161, .18);
+  background:
+    radial-gradient(circle at 78% 18%, rgba(85, 233, 255, .38), transparent 28%),
+    radial-gradient(circle at 10% 110%, rgba(127, 92, 255, .52), transparent 42%),
+    linear-gradient(128deg, #074ab5 0%, #176fe3 43%, #5639c7 100%);
+  box-shadow: 0 12px 34px rgba(28, 76, 170, .26);
 }
-.eyebrow { margin: 0 0 4px; font-size: 12px; opacity: .78; }
-.app-header h1 { margin: 0; font-size: 25px; letter-spacing: .02em; }
+.app-header::before {
+  content: ""; position: absolute; inset: 0; opacity: .3; pointer-events: none;
+  background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size: 34px 34px; transform: perspective(220px) rotateX(58deg) scale(1.35) translateY(34px);
+}
+.header-copy, .icon-button { position: relative; z-index: 3; }
+.campus-chip { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; padding: 5px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; color: rgba(255,255,255,.88); background: rgba(255,255,255,.12); backdrop-filter: blur(8px); font-size: 10px; letter-spacing: .08em; }
+.campus-chip span { padding: 2px 5px; border-radius: 5px; color: #1650a8; background: #fff; font-weight: 800; letter-spacing: .04em; }
+.eyebrow { margin: 0 0 9px; font-size: 12px; opacity: .78; }
+.header-title-row { display: flex; align-items: center; gap: 11px; }
+.header-avatar { width: 48px; height: 48px; object-fit: cover; border: 2px solid rgba(255,255,255,.82); border-radius: 16px; box-shadow: 0 7px 20px rgba(5,31,94,.3); }
+.app-header h1 { margin: 0; font-size: 27px; letter-spacing: .02em; text-shadow: 0 3px 14px rgba(6,33,95,.25); }
+.header-subtitle { margin: 3px 0 0; color: rgba(255,255,255,.75); font-size: 10px; }
 .icon-button {
-  width: 42px; height: 42px; border: 0; border-radius: 14px;
-  color: var(--primary); background: #fff; font-size: 27px; line-height: 1;
-  box-shadow: 0 5px 14px rgba(0,0,0,.16);
+  width: 48px; height: 48px; border: 1px solid rgba(255,255,255,.55); border-radius: 17px;
+  color: white; background: linear-gradient(145deg, rgba(255,255,255,.32), rgba(255,255,255,.12));
+  backdrop-filter: blur(12px); font-size: 28px; line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 20px rgba(3,32,95,.23);
 }
+.header-decoration { position: absolute; z-index: 1; border: 1px solid rgba(255,255,255,.22); border-radius: 50%; pointer-events: none; }
+.header-decoration-one { width: 128px; height: 128px; right: -34px; top: -48px; box-shadow: 0 0 44px rgba(94,239,255,.2); }
+.header-decoration-two { width: 72px; height: 72px; right: 73px; bottom: -41px; background: rgba(255,255,255,.06); }
+.header-dots { position: absolute; right: 23px; bottom: 15px; z-index: 3; display: flex; gap: 5px; }
+.header-dots i { display: block; width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,.65); }
+.header-dots i:nth-child(2) { width: 13px; border-radius: 999px; background: #65e8ff; }
 
 main { padding-bottom: calc(92px + var(--safe-bottom)); }
 .view { display: none; padding: 18px 16px; }

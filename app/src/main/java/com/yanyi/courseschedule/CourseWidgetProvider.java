@@ -12,6 +12,10 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.BitmapShader;
+import android.graphics.Paint;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.os.Build;
 import android.widget.RemoteViews;
 import org.json.JSONArray;
@@ -99,9 +103,17 @@ public class CourseWidgetProvider extends AppWidgetProvider {
         File backgroundFile = new File(context.getFilesDir(), "widget_background.jpg");
         Bitmap background = backgroundFile.exists() ? BitmapFactory.decodeFile(backgroundFile.getAbsolutePath()) : null;
         if (background != null) {
-            Bitmap rendered = background.copy(Bitmap.Config.ARGB_8888, true);
+            Bitmap rendered = Bitmap.createBitmap(background.getWidth(), background.getHeight(), Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(rendered);
+            RectF bounds = new RectF(0, 0, rendered.getWidth(), rendered.getHeight());
+            float radius = Math.max(22f, rendered.getWidth() * 0.065f);
+            Paint imagePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            imagePaint.setShader(new BitmapShader(background, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+            canvas.drawRoundRect(bounds, radius, radius, imagePaint);
             int overlayPercent = preferences.getInt(KEY_OVERLAY, 35);
-            new Canvas(rendered).drawColor(Color.argb(Math.round(255 * overlayPercent / 100f), 0, 0, 0));
+            Paint overlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            overlayPaint.setColor(Color.argb(Math.round(255 * overlayPercent / 100f), 0, 0, 0));
+            canvas.drawRoundRect(bounds, radius, radius, overlayPaint);
             views.setImageViewBitmap(R.id.widget_background_image, rendered);
             views.setViewVisibility(R.id.widget_background_image, android.view.View.VISIBLE);
         } else {
