@@ -4,6 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -18,6 +20,8 @@ import android.view.Window;
 import android.widget.Toast;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +32,7 @@ public class MainActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 201;
     private static final int EXPORT_SCHEDULE_REQUEST = 301;
     private static final int IMPORT_SCHEDULE_REQUEST = 302;
+    private static final int WIDGET_BACKGROUND_REQUEST = 303;
     private String pendingExportJson = "";
 
     @Override
@@ -86,6 +91,33 @@ public class MainActivity extends Activity {
         public void updateSchedule(String scheduleJson) {
             CourseWidgetProvider.saveAndUpdate(MainActivity.this, scheduleJson);
         }
+
+        @JavascriptInterface
+        public void pickBackground() {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("image/*");
+                startActivityForResult(intent, WIDGET_BACKGROUND_REQUEST);
+            });
+        }
+
+        @JavascriptInterface
+        public void clearBackground() {
+            File background = new File(getFilesDir(), "widget_background.jpg");
+            if (background.exists()) background.delete();
+            CourseWidgetProvider.updateAll(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public boolean hasBackground() {
+            return new File(getFilesDir(), "widget_background.jpg").exists();
+        }
+
+        @JavascriptInterface
+        public void updateAppearance(String appearanceJson) {
+            CourseWidgetProvider.saveAppearance(MainActivity.this, appearanceJson);
+        }
     }
 
     public class ScheduleFileBridge {
@@ -138,6 +170,37 @@ public class MainActivity extends Activity {
                 webView.evaluateJavascript("window.handleImportedSchedule(" + JSONObject.quote(raw) + ");", null);
             } catch (Exception exception) {
                 Toast.makeText(this, "读取失败，请选择正确的课表文件", Toast.LENGTH_LONG).show();
+            }
+        } else if (requestCode == WIDGET_BACKGROUND_REQUEST) {
+            try (InputStream input = getContentResolver().openInputStream(uri)) {
+                if (input == null) throw new IllegalStateException("无法读取图片");
+                Bitmap source = BitmapFactory.decodeStream(input);
+                if (source == null) throw new IllegalStateException("图片格式不支持");
+                final int targetWidth = 480;
+                final int targetHeight = 280;
+                float targetRatio = (float) targetWidth / targetHeight;
+                int cropWidth = source.getWidth();
+                int cropHeight = source.getHeight();
+                if ((float) cropWidth / cropHeight > targetRatio) {
+                    cropWidth = Math.round(cropHeight * targetRatio);
+                } else {
+                    cropHeight = Math.round(cropWidth / targetRatio);
+                }
+                int left = (source.getWidth() - cropWidth) / 2;
+                int top = (source.getHeight() - cropHeight) / 2;
+                Bitmap cropped = Bitmap.createBitmap(source, left, top, cropWidth, cropHeight);
+                Bitmap scaled = Bitmap.createScaledBitmap(cropped, targetWidth, targetHeight, true);
+                File background = new File(getFilesDir(), "widget_background.jpg");
+                try (FileOutputStream output = new FileOutputStream(background)) {
+                    scaled.compress(Bitmap.CompressFormat.JPEG, 90, output);
+                }
+                if (scaled != cropped) scaled.recycle();
+                if (cropped != source) cropped.recycle();
+                source.recycle();
+                CourseWidgetProvider.updateAll(this);
+                webView.evaluateJavascript("window.onWidgetBackgroundChanged(true);", null);
+            } catch (Exception exception) {
+                Toast.makeText(this, "背景图片设置失败，请换一张图片重试", Toast.LENGTH_LONG).show();
             }
         }
     }

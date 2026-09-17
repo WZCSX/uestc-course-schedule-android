@@ -88,11 +88,31 @@
           <div id="timeSettings"></div>
         </div>
         <div class="settings-card">
+          <h3>桌面小组件外观</h3>
+          <p>可以使用自己的照片作为背景，并调整文字与背景的显示效果。修改后桌面小组件会立即刷新。</p>
+          <label class="widget-setting">小组件标题
+            <input id="widgetTitle" maxlength="12" placeholder="例如：我的课程" />
+          </label>
+          <label class="widget-setting">文字颜色
+            <select id="widgetTextTheme">
+              <option value="light">浅色文字</option>
+              <option value="dark">深色文字</option>
+            </select>
+          </label>
+          <label class="widget-setting range-setting">背景遮罩
+            <span id="widgetOverlayValue">35%</span>
+            <input id="widgetOverlay" type="range" min="0" max="80" step="5" value="35" />
+          </label>
+          <button class="setting-action" id="widgetBackgroundButton">选择背景图片</button>
+          <button class="setting-action danger" id="clearWidgetBackgroundButton">清除背景图片</button>
+          <p class="widget-background-status" id="widgetBackgroundStatus">当前使用默认蓝色背景</p>
+        </div>
+        <div class="settings-card">
           <h3>数据管理</h3>
           <button class="setting-action" id="exportButton">导出课程数据</button>
           <button class="setting-action" id="importButton">导入课程数据</button>
           <input type="file" id="importInput" accept=".json,application/json" hidden />
-          <button class="setting-action danger" id="resetButton">恢复图片中的原始课程</button>
+          <button class="setting-action danger" id="resetButton">清空全部课程</button>
         </div>
         <div class="settings-card note-card">
           <h3>校历说明</h3>

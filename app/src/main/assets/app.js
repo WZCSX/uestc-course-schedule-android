@@ -47,11 +47,12 @@ const DEFAULT_TIMES = {
   '9-10节':'19:30—21:55'
 };
 
-let courses = load('courses', ORIGINAL_COURSES);
+let courses = load('courses', []);
 let classTimes = load('classTimes', DEFAULT_TIMES);
 let reminderEnabled = localStorage.getItem('reminderEnabled') !== 'false';
 let reminderMinutes = Number(localStorage.getItem('reminderMinutes') || 15);
 let scheduleMode = localStorage.getItem('scheduleMode') || 'day';
+let widgetAppearance = load('widgetAppearance', {title:'', textTheme:'light', overlay:35});
 let selectedWeek = clamp(getWeekNumber(new Date()), 1, 20);
 let selectedDay = getMondayDay(new Date());
 
@@ -181,6 +182,33 @@ function renderSettings() {
   enabled.checked = reminderEnabled;
   minutes.value = String(reminderMinutes);
   status.textContent = reminderEnabled ? `将在上课前${reminderMinutes}分钟通知` : '提醒已关闭';
+  document.getElementById('widgetTitle').value = widgetAppearance.title || '';
+  document.getElementById('widgetTextTheme').value = widgetAppearance.textTheme || 'light';
+  document.getElementById('widgetOverlay').value = String(widgetAppearance.overlay ?? 35);
+  document.getElementById('widgetOverlayValue').textContent = `${widgetAppearance.overlay ?? 35}%`;
+  refreshWidgetBackgroundStatus();
+}
+
+function refreshWidgetBackgroundStatus(hasBackground) {
+  if (typeof hasBackground !== 'boolean' && window.WidgetBridge?.hasBackground) {
+    hasBackground = Boolean(window.WidgetBridge.hasBackground());
+  }
+  const status = document.getElementById('widgetBackgroundStatus');
+  if (status) status.textContent = hasBackground ? '当前使用自定义背景图片' : '当前使用默认蓝色背景';
+}
+
+function saveWidgetAppearance() {
+  widgetAppearance = {
+    title:document.getElementById('widgetTitle').value.trim(),
+    textTheme:document.getElementById('widgetTextTheme').value,
+    overlay:Number(document.getElementById('widgetOverlay').value)
+  };
+  localStorage.setItem('widgetAppearance', JSON.stringify(widgetAppearance));
+  document.getElementById('widgetOverlayValue').textContent = `${widgetAppearance.overlay}%`;
+  if (window.WidgetBridge?.updateAppearance) {
+    window.WidgetBridge.updateAppearance(JSON.stringify(widgetAppearance));
+    showToast('小组件外观已更新');
+  }
 }
 
 function colorForName(name) {
@@ -382,8 +410,8 @@ document.getElementById('importInput').addEventListener('change', async event =>
   event.target.value='';
 });
 document.getElementById('resetButton').addEventListener('click', () => {
-  if (!confirm('这会删除你自己添加或修改的课程，确定恢复吗？')) return;
-  courses=clone(ORIGINAL_COURSES); save(); renderAll(); scheduleReminders(); showToast('已恢复原始课程');
+  if (!confirm('这会删除当前全部课程，确定清空吗？')) return;
+  courses=[]; save(); renderAll(); scheduleReminders(); showToast('课程已全部清空');
 });
 document.getElementById('reminderEnabled').addEventListener('change', event => {
   reminderEnabled = event.target.checked;
@@ -395,6 +423,27 @@ document.getElementById('reminderMinutes').addEventListener('change', event => {
   renderSettings();
   scheduleReminders();
 });
+document.getElementById('widgetTitle').addEventListener('change', saveWidgetAppearance);
+document.getElementById('widgetTextTheme').addEventListener('change', saveWidgetAppearance);
+document.getElementById('widgetOverlay').addEventListener('input', event => {
+  document.getElementById('widgetOverlayValue').textContent = `${event.target.value}%`;
+});
+document.getElementById('widgetOverlay').addEventListener('change', saveWidgetAppearance);
+document.getElementById('widgetBackgroundButton').addEventListener('click', () => {
+  if (window.WidgetBridge?.pickBackground) window.WidgetBridge.pickBackground();
+  else showToast('桌面小组件背景仅在安卓 App 中可用');
+});
+document.getElementById('clearWidgetBackgroundButton').addEventListener('click', () => {
+  if (window.WidgetBridge?.clearBackground) {
+    window.WidgetBridge.clearBackground();
+    refreshWidgetBackgroundStatus(false);
+    showToast('已恢复默认小组件背景');
+  }
+});
+window.onWidgetBackgroundChanged = hasBackground => {
+  refreshWidgetBackgroundStatus(Boolean(hasBackground));
+  if (hasBackground) showToast('小组件背景已更新');
+};
 
 let toastTimer;
 function showToast(message) { const t=document.getElementById('toast'); t.textContent=message; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1800); }
