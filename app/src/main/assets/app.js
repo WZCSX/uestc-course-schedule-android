@@ -182,11 +182,34 @@ function renderSettings() {
   enabled.checked = reminderEnabled;
   minutes.value = String(reminderMinutes);
   status.textContent = reminderEnabled ? `将在上课前${reminderMinutes}分钟通知` : '提醒已关闭';
+  refreshReminderPermissionStatus();
   document.getElementById('widgetTitle').value = widgetAppearance.title || '';
   document.getElementById('widgetTextTheme').value = widgetAppearance.textTheme || 'light';
   document.getElementById('widgetOverlay').value = String(widgetAppearance.overlay ?? 35);
   document.getElementById('widgetOverlayValue').textContent = `${widgetAppearance.overlay ?? 35}%`;
   refreshWidgetBackgroundStatus();
+}
+
+function refreshReminderPermissionStatus() {
+  const element = document.getElementById('reminderPermissionStatus');
+  if (!element) return;
+  if (!window.ReminderBridge?.getStatus) {
+    element.textContent = '提醒权限状态仅能在安卓 App 中查看';
+    return;
+  }
+  try {
+    const status = JSON.parse(window.ReminderBridge.getStatus());
+    const missing = [];
+    if (!status.notificationsAllowed) missing.push('通知权限');
+    if (!status.exactAlarmsAllowed) missing.push('精确闹钟权限');
+    element.classList.toggle('ready', !missing.length);
+    element.classList.toggle('warning', Boolean(missing.length));
+    element.textContent = missing.length
+      ? `还需开启：${missing.join('、')}。当前已登记 ${status.scheduledCount || 0} 个提醒。`
+      : `系统权限正常，当前已登记 ${status.scheduledCount || 0} 个提醒。`;
+  } catch {
+    element.textContent = '暂时无法读取提醒权限状态';
+  }
 }
 
 function refreshWidgetBackgroundStatus(hasBackground) {
@@ -423,6 +446,13 @@ document.getElementById('reminderMinutes').addEventListener('change', event => {
   renderSettings();
   scheduleReminders();
 });
+document.getElementById('reminderPermissionButton').addEventListener('click', () => {
+  if (window.ReminderBridge?.openSettings) window.ReminderBridge.openSettings();
+});
+document.getElementById('testReminderButton').addEventListener('click', () => {
+  if (window.ReminderBridge?.sendTestNotification) window.ReminderBridge.sendTestNotification();
+});
+window.onReminderStatusChanged = refreshReminderPermissionStatus;
 document.getElementById('widgetTitle').addEventListener('change', saveWidgetAppearance);
 document.getElementById('widgetTextTheme').addEventListener('change', saveWidgetAppearance);
 document.getElementById('widgetOverlay').addEventListener('input', event => {

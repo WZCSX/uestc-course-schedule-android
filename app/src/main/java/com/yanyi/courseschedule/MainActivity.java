@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.JsResult;
 import android.webkit.WebSettings;
@@ -82,7 +83,87 @@ public class MainActivity extends Activity {
                 int count = ReminderScheduler.sync(MainActivity.this, remindersJson, enabled);
                 String message = enabled ? "已安排 " + count + " 个上课提醒" : "上课提醒已关闭";
                 Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                notifyReminderStatusChanged();
             });
+        }
+
+        @JavascriptInterface
+        public String getStatus() {
+            return ReminderScheduler.getStatus(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void openSettings() {
+            runOnUiThread(() -> openRequiredReminderPermission());
+        }
+
+        @JavascriptInterface
+        public void sendTestNotification() {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= 33 &&
+                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(MainActivity.this, "请先允许通知权限", Toast.LENGTH_LONG).show();
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+                    return;
+                }
+                Intent test = new Intent(MainActivity.this, ReminderReceiver.class)
+                    .putExtra("notificationId", 99001)
+                    .putExtra("name", "测试课程")
+                    .putExtra("location", "通知功能正常")
+                    .putExtra("startTime", "现在");
+                sendBroadcast(test);
+                Toast.makeText(MainActivity.this, "测试通知已发送", Toast.LENGTH_SHORT).show();
+            });
+        }
+    }
+
+    private void openRequiredReminderPermission() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+            return;
+        }
+        android.app.AlarmManager manager = (android.app.AlarmManager) getSystemService(ALARM_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !manager.canScheduleExactAlarms()) {
+            try {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            } catch (Exception exception) {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())));
+            }
+            return;
+        }
+        Toast.makeText(this, "提醒所需权限均已开启", Toast.LENGTH_SHORT).show();
+        ReminderScheduler.restore(this);
+        notifyReminderStatusChanged();
+    }
+
+    private void notifyReminderStatusChanged() {
+        if (webView != null) webView.evaluateJavascript("window.onReminderStatusChanged && window.onReminderStatusChanged();", null);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                openRequiredReminderPermission();
+            } else {
+                Toast.makeText(this, "未允许通知权限，上课提醒无法显示", Toast.LENGTH_LONG).show();
+            }
+            notifyReminderStatusChanged();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            ReminderScheduler.restore(this);
+            notifyReminderStatusChanged();
+            CourseWidgetProvider.updateAll(this);
         }
     }
 
@@ -176,8 +257,8 @@ public class MainActivity extends Activity {
                 if (input == null) throw new IllegalStateException("无法读取图片");
                 Bitmap source = BitmapFactory.decodeStream(input);
                 if (source == null) throw new IllegalStateException("图片格式不支持");
-                final int targetWidth = 480;
-                final int targetHeight = 280;
+                final int targetWidth = 320;
+                final int targetHeight = 190;
                 float targetRatio = (float) targetWidth / targetHeight;
                 int cropWidth = source.getWidth();
                 int cropHeight = source.getHeight();

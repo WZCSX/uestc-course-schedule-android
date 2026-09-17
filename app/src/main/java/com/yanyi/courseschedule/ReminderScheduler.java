@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.content.pm.PackageManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.HashSet;
@@ -18,6 +19,7 @@ public final class ReminderScheduler {
     private static final String KEY_JSON = "reminders_json";
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_IDS = "alarm_ids";
+    private static final String KEY_COUNT = "scheduled_count";
 
     private ReminderScheduler() {}
 
@@ -37,7 +39,10 @@ public final class ReminderScheduler {
             .putString(KEY_JSON, json == null ? "[]" : json)
             .putBoolean(KEY_ENABLED, enabled)
             .apply();
-        if (!enabled || json == null) return 0;
+        if (!enabled || json == null) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(KEY_COUNT, 0).apply();
+            return 0;
+        }
         Set<String> ids = new HashSet<>();
         int count = 0;
         try {
@@ -70,7 +75,10 @@ public final class ReminderScheduler {
                 count++;
             }
         } catch (Exception ignored) {}
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putStringSet(KEY_IDS, ids).apply();
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putStringSet(KEY_IDS, ids)
+            .putInt(KEY_COUNT, count)
+            .apply();
         return count;
     }
 
@@ -98,5 +106,22 @@ public final class ReminderScheduler {
         boolean enabled = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ENABLED, false);
         String json = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_JSON, "[]");
         sync(context, json, enabled);
+    }
+
+    public static String getStatus(Context context) {
+        boolean notificationsAllowed = Build.VERSION.SDK_INT < 33 ||
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        boolean exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms();
+        int count = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_COUNT, 0);
+        try {
+            return new JSONObject()
+                .put("notificationsAllowed", notificationsAllowed)
+                .put("exactAlarmsAllowed", exactAllowed)
+                .put("scheduledCount", count)
+                .toString();
+        } catch (Exception ignored) {
+            return "{}";
+        }
     }
 }

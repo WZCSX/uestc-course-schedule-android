@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.os.Build;
 import android.widget.RemoteViews;
@@ -76,8 +77,8 @@ public class CourseWidgetProvider extends AppWidgetProvider {
         for (int id : ids) {
             try {
                 manager.updateAppWidget(id, buildViews(context));
-            } catch (Exception ignored) {
-                RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.course_widget);
+            } catch (Exception exception) {
+                RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.course_widget_fallback);
                 fallback.setTextViewText(R.id.widget_date, "研一课程表");
                 fallback.setTextViewText(R.id.widget_count, "请打开一次 App");
                 fallback.setTextViewText(R.id.widget_empty, "正在准备今天的课程");
@@ -98,14 +99,14 @@ public class CourseWidgetProvider extends AppWidgetProvider {
         File backgroundFile = new File(context.getFilesDir(), "widget_background.jpg");
         Bitmap background = backgroundFile.exists() ? BitmapFactory.decodeFile(backgroundFile.getAbsolutePath()) : null;
         if (background != null) {
-            views.setImageViewBitmap(R.id.widget_background_image, background);
+            Bitmap rendered = background.copy(Bitmap.Config.ARGB_8888, true);
+            int overlayPercent = preferences.getInt(KEY_OVERLAY, 35);
+            new Canvas(rendered).drawColor(Color.argb(Math.round(255 * overlayPercent / 100f), 0, 0, 0));
+            views.setImageViewBitmap(R.id.widget_background_image, rendered);
             views.setViewVisibility(R.id.widget_background_image, android.view.View.VISIBLE);
         } else {
             views.setViewVisibility(R.id.widget_background_image, android.view.View.GONE);
         }
-        int overlayPercent = preferences.getInt(KEY_OVERLAY, 35);
-        views.setInt(R.id.widget_overlay, "setBackgroundColor", Color.argb(Math.round(255 * overlayPercent / 100f), 0, 0, 0));
-        views.setViewVisibility(R.id.widget_overlay, overlayPercent > 0 ? android.view.View.VISIBLE : android.view.View.GONE);
 
         boolean darkText = "dark".equals(preferences.getString(KEY_TEXT_THEME, "light"));
         int mainText = darkText ? Color.rgb(24, 36, 55) : Color.WHITE;

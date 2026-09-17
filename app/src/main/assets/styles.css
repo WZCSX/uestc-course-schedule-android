@@ -125,6 +125,9 @@ main { padding-bottom: calc(92px + var(--safe-bottom)); }
 .reminder-select { display: grid; grid-template-columns: 1fr 115px; align-items: center; gap: 12px; margin-top: 17px; color: var(--muted); font-size: 12px; }
 .reminder-select select { padding: 10px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: white; }
 .reminder-help { margin: 13px 0 0 !important; }
+.system-status { margin: 13px 0 2px !important; padding: 10px 12px; border-radius: 11px; background: #f2f6fc; color: var(--muted); font-size: 11px !important; line-height: 1.55 !important; }
+.system-status.ready { color: #087a55; background: #e9faf3; }
+.system-status.warning { color: #a46208; background: #fff6e5; }
 .time-setting { display: grid; grid-template-columns: 65px 1fr; align-items: center; gap: 10px; margin-top: 9px; }
 .time-setting label { color: var(--muted); font-size: 12px; }
 .time-setting input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 11px; }
