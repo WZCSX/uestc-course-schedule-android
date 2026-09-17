@@ -2,13 +2,16 @@ package com.yanyi.courseschedule;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.JavascriptInterface;
+import android.webkit.JsResult;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebChromeClient;
 import android.webkit.WebViewClient;
 import android.graphics.Color;
 import android.view.Window;
@@ -46,6 +49,19 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new ReminderBridge(), "ReminderBridge");
         webView.addJavascriptInterface(new WidgetBridge(), "WidgetBridge");
         webView.addJavascriptInterface(new ScheduleFileBridge(), "ScheduleFileBridge");
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("请确认")
+                    .setMessage(message)
+                    .setPositiveButton("确定", (dialog, which) -> result.confirm())
+                    .setNegativeButton("取消", (dialog, which) -> result.cancel())
+                    .setOnCancelListener(dialog -> result.cancel())
+                    .show();
+                return true;
+            }
+        });
         webView.setWebViewClient(new WebViewClient());
         webView.loadUrl(LOCAL_APP);
     }
